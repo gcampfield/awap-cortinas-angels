@@ -75,6 +75,25 @@ class Player(BasePlayer):
                 for i in range(0, len(path[1])-1):
                     self.current_graph.add_edge(path[1][i], path[1][i+1])
 
+    def pick_orders(self, state):
+    	commands = []
+
+    	paths = []
+        pending_orders = state.get_pending_orders()
+
+        for order in sorted(pending_orders, key=bstar_betta_have_my_money):
+            if order not in state.get_active_orders():
+                cur_min = []
+                for station in self.stations:
+                    path = nx.shortest_path(self.get_graph(), station, order.get_node())
+                    if self.path_is_valid(state, path) and (len(path) < len(cur_min) or cur_min == []):
+                        cur_min = path
+                if cur_min != []:
+                    commands.append(self.send_command(order, cur_min))
+                    self.add_path(state, cur_min)
+                    print ">>> SEND_COMMAND: path = "+str(cur_min)
+
+        return commands
 
     def step(self, state):
         """
@@ -109,20 +128,5 @@ class Player(BasePlayer):
             print ">>> BUILD_COMMAND: node = "+str(new_station)
             self.stations.append(new_station)
             commands.append(self.build_command(new_station))
-
-        paths = []
-        pending_orders = state.get_pending_orders()
-
-        for order in sorted(pending_orders, key=bstar_betta_have_my_money):
-            if order not in state.get_active_orders():
-                cur_min = []
-                for station in self.stations:
-                    path = nx.shortest_path(self.get_graph(), station, order.get_node())
-                    if self.path_is_valid(state, path) and (len(path) < len(cur_min) or cur_min == []):
-                        cur_min = path
-                if cur_min != []:
-                    commands.append(self.send_command(order, cur_min))
-                    self.add_path(state, cur_min)
-                    print ">>> SEND_COMMAND: path = "+str(cur_min)
 
         return commands
