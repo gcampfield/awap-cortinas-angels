@@ -74,12 +74,13 @@ class Player(BasePlayer):
                         top.remove(index)
 
         pending_orders = state.get_pending_orders()
-        #If there's a new order
-        if pending_orders[-1].id > self.last_order:
-            self.last_order = pending_orders[-1].id
-            self.inc_heatmap(graph, pending_orders[-1].node)
 
         if len(pending_orders) != 0:
+            #If there's a new order
+            if pending_orders[-1].id > self.last_order:
+                self.last_order = pending_orders[-1].id
+                self.inc_heatmap(graph, pending_orders[-1].node)
+
             order = random.choice(pending_orders)
             paths = [nx.shortest_path(graph, station, order.get_node()) for station in self.stations]
             paths = [path for path in paths if self.path_is_valid(state, path)]
