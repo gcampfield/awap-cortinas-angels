@@ -21,6 +21,7 @@ class Player(BasePlayer):
             The initial state of the game. See state.py for more information.
         """
         self.has_built_station = False
+        self.build_cost = INIT_BUILD_COST
         self.size = len(state.get_graph().nodes())
         self.heatmap = [1 for _ in range(self.size)]
         self.last_order = -1
@@ -54,27 +55,43 @@ class Player(BasePlayer):
         self.money = state.money
 
         commands = []
+
+        # Station Building
         if not self.has_built_station:
             middle = sqrt(self.size) // 2 * sqrt(self.size) + sqrt(self.size) // 2
             starting_set = graph.neighbors(middle) + [int(middle)]
             start = self.best_of_best(graph, starting_set)
             station = start
             commands.append(self.build_command(station))
+            self.build_cost *= BUILD_FACTOR
             self.stations.add(station)
             self.dec_heatmap(graph, station)
             self.has_built_station = True
         else:
-            top = [graph[0]]
-            for node in graph:
+            top = [(node, self.heatmap[node] * len(graph.neighbors(node))) for node in range(int(sqrt(self.size)))]
+            for node in graph.nodes()[int(sqrt(self.size)):]:
                 value = self.heatmap[node] * len(graph.neighbors(node))
                 index = self.min_index(top)
-                if value > top[index]:
-                    top.append(node)
-                    if len(top) > sqrt(self.size):
-                        top.remove(index)
+                if value > top[index][1]:
+                    top.append((node, value))
+                    top.pop(index)
+            maxValue = 0
+            bestNode = None
+            for node, _ in top:
+                s = sum([len(nx.shortest_path(graph, s, node)) for s in self.stations])
+                if s > maxValue:
+                    maxValue = s
+                    bestNode = node
 
+            # if self.worth_it(station):    
+            if self.money > self.build_cost:
+                self.stations.add(bestNode)
+                self.build_cost *= BUILD_FACTOR
+                commands.append(self.build_command(bestNode))
+                self.dec_heatmap(graph, bestNode)
+
+        # Order Routing
         pending_orders = state.get_pending_orders()
-
         if len(pending_orders) != 0:
             #If there's a new order
             if pending_orders[-1].id > self.last_order:
@@ -91,11 +108,11 @@ class Player(BasePlayer):
         return commands
 
     def min_index(self, l):
-        value = l[0]
+        value = l[0][1]
         index = 0
         for i in range(len(l)):
-            if l[i] < value:
-                value = l[i]
+            if l[i][0] < value:
+                value = l[i][0]
                 index = i
         return index
 
@@ -137,7 +154,6 @@ class Player(BasePlayer):
         bestValue = -1
         bestNode = None
         for node in best:
-            print node
             newValue = self.heatmap[node] * len(graph.neighbors(node))
             if newValue > bestValue:
                 bestValue = newValue
