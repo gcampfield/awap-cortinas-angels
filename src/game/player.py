@@ -133,13 +133,8 @@ class Player(BasePlayer):
         scores_per_turn = [s[2] * average_score  / s[1] for s in self.stations]
         average = sum(scores_per_turn) / len(self.stations)
 
-        print (GAME_LENGTH - self.time) * average
-        print self.build_cost
-
         if (GAME_LENGTH - self.time) * average > self.build_cost:
-            print ">>> Decided to BUILD!"
             return True
-        print ">>> Decided to NOT build!"
         return False
 
     def inc_node_heat(self, graph, node, visited, depth):
