@@ -2,6 +2,7 @@ import networkx as nx
 import random
 from base_player import BasePlayer
 from settings import *
+from math import sqrt
 
 class Player(BasePlayer):
     """
@@ -9,8 +10,6 @@ class Player(BasePlayer):
     name or the base class.
     """
 
-    # You can set up static state here
-    has_built_station = False
 
     def __init__(self, state):
         """
@@ -21,8 +20,11 @@ class Player(BasePlayer):
         state : State
             The initial state of the game. See state.py for more information.
         """
-
-        return
+        self.has_built_station = False
+        self.size = len(state.get_graph().nodes())
+        self.heatmap = [0 for _ in range(self.size)]
+        self.last_order = -1
+        self.heatdepth = int(sqrt(self.size) * 0.5)
 
     # Checks if we can use a given path
     def path_is_valid(self, state, path):
@@ -46,10 +48,6 @@ class Player(BasePlayer):
             self.build_command. The commands are evaluated in order.
         """
 
-        # We have implemented a naive bot for you that builds a single station
-        # and tries to find the shortest path from it to first pending order.
-        # We recommend making it a bit smarter ;-)
-
         graph = state.get_graph()
         station = graph.nodes()[0]
 
@@ -59,6 +57,10 @@ class Player(BasePlayer):
             self.has_built_station = True
 
         pending_orders = state.get_pending_orders()
+        if pending_orders[-1].id > self.last_order:
+            self.last_order = pending_orders[-1].id
+            self.update_heatmap(graph, pending_orders[-1].node)
+
         if len(pending_orders) != 0:
             order = random.choice(pending_orders)
             path = nx.shortest_path(graph, station, order.get_node())
@@ -66,3 +68,20 @@ class Player(BasePlayer):
                 commands.append(self.send_command(order, path))
 
         return commands
+
+    def update_node_heat(self, graph, node, visited, depth):
+        """
+        Update node heat recursively.
+        """
+        if depth < 0: return
+        if node in visited: return
+        self.heatmap[node] += depth
+        visited.add(node)
+        for neighbor in graph.neighbors(node):
+            self.update_node_heat(graph, neighbor, visited, depth-1)
+
+    def update_heatmap(self, graph, node):
+        """
+        Update the heat map based on the last order submitted.
+        """
+        self.update_node_heat(graph, node, set(), self.heatdepth)
