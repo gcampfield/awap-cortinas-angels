@@ -31,6 +31,7 @@ class Player(BasePlayer):
         self.money = state.money
         self.orders_served = 0
         self.total_distance = 0
+        self.last_build_orders = 0
 
     # Checks if we can use a given path
     def path_is_valid(self, state, path):
@@ -90,7 +91,8 @@ class Player(BasePlayer):
                     maxValue = s
                     bestNode = node
 
-            if self.worth_it(bestNode) and self.money > self.build_cost:
+            if self.worth_it(bestNode) and self.money > self.build_cost and self.last_build_orders > HUBS:
+                self.last_build_orders = 0
                 self.stations.append([bestNode,  0, 0])
                 self.build_cost *= BUILD_FACTOR
                 commands.append(self.build_command(bestNode))
@@ -101,6 +103,7 @@ class Player(BasePlayer):
         if len(pending_orders) != 0:
             #If there's a new order
             if pending_orders[-1].id > self.last_order:
+                self.last_build_orders += 1
                 self.last_order = pending_orders[-1].id
                 self.inc_heatmap(graph, pending_orders[-1].node)
 

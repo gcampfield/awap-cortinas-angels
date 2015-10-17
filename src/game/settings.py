@@ -7,10 +7,10 @@ INIT_TIMEOUT = 10.0     # Number of seconds your Player can take to load
 STEP_TIMEOUT = 0.5      # Number of seconds your Player.step can take
 
 GAME_LENGTH = 1000      # Number of steps in a game
-STARTING_MONEY = 1000   # Starting money value
+STARTING_MONEY = 10000   # Starting money value
 INIT_BUILD_COST = 1000  # Initial cost to build a widget station
 BUILD_FACTOR = 1.5      # Multiplicative factor for each subsequent station
-GRAPH_SIZE = 100        # Graph size
+GRAPH_SIZE = 400        # Graph size
 HUBS = 5                # Number of hubs where orders are centered around
 ORDER_CHANCE = 0.9      # Chance that some order will be created at a step
 ORDER_VAR = 3.0         # Stddev for the Gaussian used to generate random walk
