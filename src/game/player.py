@@ -20,14 +20,17 @@ class Player(BasePlayer):
         state : State
             The initial state of the game. See state.py for more information.
         """
+        self.time = 0
         self.has_built_station = False
         self.build_cost = INIT_BUILD_COST
         self.size = len(state.get_graph().nodes())
         self.heatmap = [1 for _ in range(self.size)]
         self.last_order = -1
         self.heatdepth = int(sqrt(self.size) * 0.5)
-        self.stations = set()
+        self.stations = [] # (node, time alive, orders served)
         self.money = state.money
+        self.orders_served = 0
+        self.total_distance = 0
 
     # Checks if we can use a given path
     def path_is_valid(self, state, path):
@@ -53,6 +56,10 @@ class Player(BasePlayer):
 
         graph = state.get_graph()
         self.money = state.money
+        self.time += 1
+
+        for station in self.stations:
+            station[1] += 1
 
         commands = []
 
@@ -64,7 +71,7 @@ class Player(BasePlayer):
             station = start
             commands.append(self.build_command(station))
             self.build_cost *= BUILD_FACTOR
-            self.stations.add(station)
+            self.stations.append([station, 0, 0])
             self.dec_heatmap(graph, station)
             self.has_built_station = True
         else:
@@ -78,14 +85,13 @@ class Player(BasePlayer):
             maxValue = 0
             bestNode = None
             for node, _ in top:
-                s = sum([len(nx.shortest_path(graph, s, node)) for s in self.stations])
+                s = sum([len(nx.shortest_path(graph, station[0], node)) for station in self.stations])
                 if s > maxValue:
                     maxValue = s
                     bestNode = node
 
-            # if self.worth_it(station):    
-            if self.money > self.build_cost:
-                self.stations.add(bestNode)
+            if self.worth_it(bestNode) and self.money > self.build_cost:
+                self.stations.append([bestNode,  0, 0])
                 self.build_cost *= BUILD_FACTOR
                 commands.append(self.build_command(bestNode))
                 self.dec_heatmap(graph, bestNode)
@@ -99,11 +105,17 @@ class Player(BasePlayer):
                 self.inc_heatmap(graph, pending_orders[-1].node)
 
             order = random.choice(pending_orders)
-            paths = [nx.shortest_path(graph, station, order.get_node()) for station in self.stations]
+            paths = [nx.shortest_path(graph, station[0], order.get_node()) for station in self.stations]
             paths = [path for path in paths if self.path_is_valid(state, path)]
             if len(paths) > 0:
                 paths.sort(key=len)
+                start = paths[0][0]
+                for station in self.stations:
+                    if station[0] == start:
+                        station[2] += 1
                 commands.append(self.send_command(order, paths[0]))
+                self.orders_served += 1
+                self.total_distance += len(paths[0])
 
         return commands
 
@@ -115,6 +127,20 @@ class Player(BasePlayer):
                 value = l[i][0]
                 index = i
         return index
+
+    def worth_it(self, station):
+        average_score = (SCORE_MEAN * self.orders_served - DECAY_FACTOR * self.total_distance) / self.orders_served
+        scores_per_turn = [s[2] * average_score  / s[1] for s in self.stations]
+        average = sum(scores_per_turn) / len(self.stations)
+
+        print (GAME_LENGTH - self.time) * average
+        print self.build_cost
+
+        if (GAME_LENGTH - self.time) * average > self.build_cost:
+            print ">>> Decided to BUILD!"
+            return True
+        print ">>> Decided to NOT build!"
+        return False
 
     def inc_node_heat(self, graph, node, visited, depth):
         """
