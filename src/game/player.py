@@ -5,8 +5,8 @@ from settings import *
 from math import sqrt
 from copy import deepcopy
 
-def bstar_betta_have_my_money(order):
-    order.get_money()-DECAY_FACTOR*(GAME_LENGTH-order.get_time_created())
+def order_value(order):
+    order.get_money() - DECAY_FACTOR * (GAME_LENGTH - order.get_time_created())
 
 class Player(BasePlayer):
     """
@@ -39,11 +39,6 @@ class Player(BasePlayer):
 
         self.current_graph = deepcopy(state.get_graph().copy())
         self.paths = []
-        self.tracked_orders = []
-        self.orders = {}
-
-        for node in state.get_graph().nodes():
-            self.orders[node] = 0
 
     # Checks if we can use a given path
     def path_is_valid(self, state, path):
@@ -66,13 +61,9 @@ class Player(BasePlayer):
             Each command should be generated via self.send_command or
             self.build_command. The commands are evaluated in order.
         """
-
         graph = state.get_graph()
         self.money = state.money
         self.time += 1
-
-
-        self.remove_paths(state)
 
         for station in self.stations:
             station[1] += 1
@@ -114,7 +105,7 @@ class Player(BasePlayer):
                 self.dec_heatmap(graph, bestNode)
 
         # Order Routing
-        self.current_graph = deepcopy(state.get_graph().copy())
+        self.update_paths()
         pending_orders = state.get_pending_orders()
         if len(pending_orders) != 0:
             #If there's a new order
@@ -122,6 +113,7 @@ class Player(BasePlayer):
                 self.last_build_orders += 1
                 self.last_order = pending_orders[-1].id
                 self.inc_heatmap(graph, pending_orders[-1].node)
+
             stephensCommands = self.pick_orders(state);
             for order in stephensCommands:
                 commands.append(order)
@@ -148,7 +140,6 @@ class Player(BasePlayer):
         scores_per_turn = [s[2] * average_score  / s[1] for s in self.stations]
         average = sum(scores_per_turn) / len(self.stations)
 
-        print average_score
         if (GAME_LENGTH - self.time) * average > self.build_cost:
             return True
         return False
@@ -200,34 +191,30 @@ class Player(BasePlayer):
     def get_graph(self):
         return self.current_graph
 
-    def add_path(self, state, path):
-        self.paths.append((state.get_time(), path))
+    def remove_path(self, path):
+        self.paths.append((self.time, path))
         for i in range(0, len(path)-1):
             self.current_graph.remove_edge(path[i], path[i+1])
 
-    def remove_paths(self, state):
+    def update_paths(self):
         for path in self.paths:
-            if state.get_time() >= path[0]+len(path[1]):
-                print ">>> REMOVE_PATH: path = "+str(path)
+            if self.time >= path[0]+len(path[1]):
                 for i in range(0, len(path[1])-1):
                     self.current_graph.add_edge(path[1][i], path[1][i+1])
 
     def pick_orders(self, state):
     	commands = []
-
     	paths = []
         pending_orders = state.get_pending_orders()
 
-        for order in sorted(pending_orders, key=bstar_betta_have_my_money):
-            if order not in state.get_active_orders():
-                cur_min = []
-                for station, i, j in self.stations:
-                    path = nx.shortest_path(state.get_graph(), station, order.get_node())
-                    if self.path_is_valid(state, path) and (len(path) < len(cur_min) or cur_min == []):
-                        cur_min = path
-                if cur_min != []:
-                    commands.append(self.send_command(order, cur_min))
-                    #self.add_path(state, cur_min)
-                    print ">>> SEND_COMMAND: path = "+str(cur_min)
+        for order in sorted(pending_orders, key=order_value):
+            cur_min = []
+            possible_paths = [nx.shortest_path(self.current_graph, station[0], order.get_node()) for station in self.stations]
+            possible_paths = [path for path in possible_paths if self.path_is_valid(state, path)]
+            possible_paths.sort(key=len)
+            if len(possible_paths) > 0:
+                best = possible_paths[0]
+                commands.append(self.send_command(order, best))
+                self.remove_path(best)
 
         return commands
